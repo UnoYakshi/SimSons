@@ -28,7 +28,10 @@ ARoomGen::ARoomGen()
 	);
 
 	bUseGrid = false;
-	
+	bGenerateFloor = false;
+	_RoomCount = 0;
+	_FloorCount = 0;
+	RealRoomCount = 0;
 }
 
 void ARoomGen::Init()
@@ -43,7 +46,9 @@ void ARoomGen::Init()
 	if (bUseGrid)
 	{
 		GridPoints.Empty();
+		DoorPoints.Empty();
 	}
+	RealRoomCount = 1;
 
 	/// Set the content up...
 	if (SMeshFloor)
@@ -87,29 +92,36 @@ void ARoomGen::Init()
 				GridPoints[i].Add(NewPoint);
 			}
 		}
-
-		FTransform NewTransf;
-		for (auto i : GridPoints)
+		//
+		if (bGenerateFloor)
 		{
-			for (auto j : i)
+			FTransform NewTransf;
+			for (auto i : GridPoints)
 			{
-				NewTransf.SetLocation(j);
-				ISMeshCompFloor->AddInstance(NewTransf);
+				for (auto j : i)
+				{
+					NewTransf.SetLocation(j);
+					ISMeshCompFloor->AddInstance(NewTransf);
+				}
 			}
 		}
+		//*/
 	}
 	else
 	{
-		/// Generating floor's instances w/o considering grid...
-		for (int32 i = 0; i < XNum; ++i)
+		if (bGenerateFloor)
 		{
-			for (int32 j = 0; j < YNum; ++j)
+			/// Generating floor's instances w/o considering grid...
+			for (int32 i = 0; i < XNum; ++i)
 			{
-				FTransform NewTransf;
-				NewTransf.SetLocation(FVector(FloorX * i, FloorY * j, 0));
-				ISMeshCompFloor->AddInstance(NewTransf);
+				for (int32 j = 0; j < YNum; ++j)
+				{
+					FTransform NewTransf;
+					NewTransf.SetLocation(FVector(FloorX * i, FloorY * j, 0));
+					ISMeshCompFloor->AddInstance(NewTransf);
 
-				GLog->Log("RoomGen :: Tile...");
+					GLog->Log("RoomGen :: Tile...");
+				}
 			}
 		}
 	}
@@ -143,18 +155,41 @@ void ARoomGen::PostEditChangeProperty(struct FPropertyChangedEvent& e)
 	//FName PropertyName = (e.Property != NULL) ? e.Property->GetFName() : NAME_None;
 	//if (PropertyName == GET_MEMBER_NAME_CHECKED(float, XLen))
 	//{
-	if (FloorX != 0 && FloorY != 0 &&
-		WallX != 0 && WallY != 0)
-	{
-		_RoomCount = RoomCount - 1;
-		Init();
-		GenerateRooms();
-		GenerateDoorways();
-	}
+	Start();
 	//}
 }
 #endif
 
+void ARoomGen::Start()
+{
+	if (FloorX != 0 && FloorY != 0 &&
+		WallX != 0 && WallY != 0)
+	{
+		_RoomCount = RoomCount - 1;
+		_FloorCount = FloorCount - 1;
+		
+		/// Auto-generation if previous failed...
+		/*
+		for (int32 Try = 0; RealRoomCount < _RoomCount; ++Try)
+		{
+			Init();
+			if (Try == RG_INF_LOOP_MAX / 4)
+			{
+				GLog->Log("Start :: Change parameters");
+				RealRoomCount = 0;
+				return;
+			}
+			GenerateRooms();
+			GenerateDoorways();
+		}
+		//*/
+		
+		Init();
+		GenerateRooms();
+		GenerateDoorways();
+
+	}
+}
 
 void ARoomGen::GenerateRooms()
 {
@@ -175,19 +210,21 @@ void ARoomGen::GenerateRooms()
 	FRoom* SecondRoom = new FRoom(From, To);
 
 
-	for (int32 RoomNumber = _RoomCount - 1; RoomNumber >= 0; --RoomNumber)
+	for (int32 RoomNumber = _RoomCount - 1; RoomNumber >= 0; --RoomNumber, ++RealRoomCount)
 	{
 		GLog->Log(FString::Printf(_T("\n ---- \n %d :: Generate Room"), (_RoomCount - RoomNumber)));
+		//++RealRoomCount;
 
 		//*
 		/// Check if CurrentRoom can handle new ones...
-		if (CurrentRoom->Width < 2 * MinRoomY || CurrentRoom->Length < 2 * MinRoomX)
+		//if (CurrentRoom->Width < 2 * MinRoomY || CurrentRoom->Length < 2 * MinRoomX)
+		if (CurrentRoom->Width < MinRoomY || CurrentRoom->Length < MinRoomX)
 		{
 			GLog->Log("RoomGen :: Not ENOUGH SPACE...");
 
 			/// Find max square room...
 			int32 MaxSquare = 0;
-			int32 MaxSquareRoom = 0;
+			bool bChanged = false;
 			for (FRoom it : Rooms)
 			{
 				if (it.Length >= MinRoomX &&
@@ -196,12 +233,18 @@ void ARoomGen::GenerateRooms()
 				{
 					MaxSquare = it.Square;
 					*CurrentRoom = it;
+					bChanged = true;
 				}
+			}
+			if (!bChanged)
+			{
+				GLog->Log("RoomGen :: Not more rooms...");
+				return;
 			}
 
 			/// Assign max square room's to current coordinates...
 			Start = CurrentRoom->Origin;
-			End = CurrentRoom->End;
+			End = CurrentRoom->End;	
 		}
 		//*/
 
@@ -381,7 +424,6 @@ void ARoomGen::GenerateRooms()
 
 		GenerateWall(From, To, TempRot);
 	}
-
 	GLog->Log("RoomGen :: Completed");
 }
 
@@ -423,12 +465,9 @@ void ARoomGen::GenerateWall(const FVector From, const FVector To, const FRotator
 	{
 		for (int32 j = MinY; j < MaxY; j += BlockX)
 		{
-			//FTransform NewTransform(Rot.Quaternion(), FVector(From.X, (float)j, 0.f));
 			//*
-			FTransform NewTransform(Rot); //= GetTransform();
-										  //NewTransform.SetRotation(Rot.Quaternion());
+			FTransform NewTransform(Rot); 
 			NewTransform.SetLocation(FVector(From.X, (float)j, 0.f));
-			//NewTransform.SetScale3D(FVector(1.f, 1.f, 1.f));
 			//*/
 			ISMeshCompWall->AddInstance(NewTransform);
 		}
@@ -437,11 +476,8 @@ void ARoomGen::GenerateWall(const FVector From, const FVector To, const FRotator
 	{
 		for (int32 i = MinX; i < MaxX; i += BlockY)
 		{
-			//FTransform NewTransform(Rot.Quaternion(), FVector((float)i, From.Y, 0.f));
-
 			//*
-			FTransform NewTransform(Rot); //= GetTransform();
-										  //NewTransform.SetRotation(Rot.Quaternion());
+			FTransform NewTransform(Rot); 
 			NewTransform.SetLocation(FVector((float)i, From.Y, 0.f));
 			//*/
 			ISMeshCompWall->AddInstance(NewTransform);
@@ -518,9 +554,9 @@ void ARoomGen::GenerateDoorways()
 	{
 		return;
 	}
-	int32 MaxStep = FMath::Log2(RoomCount);// +2;
+	int32 MaxStep = FMath::Log2(RoomCount);
 
-										   /// Check for all intersections...
+	/// Check for all intersections...
 	for (int32 i = 0; i < Crit; ++i)
 	{
 		/*
@@ -552,27 +588,20 @@ void ARoomGen::GenerateDoorways()
 			{
 				break;
 			}
-			//FMath::Clamp(j, 0, Crit-1);
-
 
 			//*
 			/// Find a wall between to rooms...
-			WallCenterBetween2Rooms = Rooms[i].GetIntersectionCenterWith(Rooms[j]);//, FVector(WallX, WallY, 400.f));
+			WallCenterBetween2Rooms = Rooms[i].GetIntersectionCenterWith(Rooms[j], FVector(WallX, WallY, 0));
 			if (WallCenterBetween2Rooms != FVector::ZeroVector)
 			{
-				// @TODO :: Deal with shift... IDK what cause it...
 				//WallCenterBetween2Rooms += FVector(560.f, 150.f, 500.f);
-				WallCenterBetween2Rooms.Z = 500.f;
+				//WallCenterBetween2Rooms.Z = 500.f;
+				/*
 				GLog->Log("\n ---- \n DoorGen :: Intersection");
 				GLog->Log(FString::Printf(_T("Room[%d] -- Rooms[%d]"), i, j));
 				GLog->Log(WallCenterBetween2Rooms.ToString());
-
-				//FTransform NT = GetTransform();
-				FTransform NT;
-				NT.SetLocation(WallCenterBetween2Rooms);
-				//NT.AddToTranslation(WallCenterBetween2Rooms);
-				ISMeshCompDoorway->AddInstance(NT);
-				//MakeHole(WallCenterBetween2Rooms);
+				//*/
+				MakeHole(WallCenterBetween2Rooms);
 			}
 			//*/
 		}
@@ -599,6 +628,30 @@ bool ARoomGen::SatisfyLimits(const FVector PointToCheck, const FRoom* InRoom, co
 	//GLog->Log(FString::Printf(_T("Limit :: Room: %d x %d"), (int32)InRoom->Length, (int32)InRoom->Width));
 	GLog->Log(FString::Printf(_T("Limit :: Dot: (%d ; %d)\n\n"), (int32)PointToCheck.X, (int32)PointToCheck.Y));
 	//*/
+	
+	if (bUseGrid)
+	{
+		/// Check every Restriction...
+		for (FRoom NoRoom : Restrictions)
+		{
+			if (IsHorizontal)
+			{
+				if (NoRoom.Origin.Y <= PointToCheck.Y && NoRoom.End.Y >= PointToCheck.Y)
+				{
+					return false;
+				}
+			}
+			else
+			{
+				if (NoRoom.Origin.X <= PointToCheck.X && NoRoom.End.X >= PointToCheck.X)
+				{
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
 
 	if (IsHorizontal)
 	{
@@ -625,19 +678,23 @@ FVector ARoomGen::GeneratePoint(const FVector From, const FVector To)
 {
 	FVector CurrentPoint;
 	TArray< FVector > PossiblePoints;
-	/*
+	//*
 	for (auto Row : GridPoints)
 	{
-		for (FVector Cell : row)
+		for (FVector Cell : Row)
 		{
-			if (From.X <= Cell.X && From.Y <= cell.Y &&
-				To.X <= cell.X && To.X <= cell.X)
+			CurrentPoint = Cell;
+			if (From.X <= Cell.X &&
+				From.Y <= Cell.Y &&
+				To.X >= Cell.X &&
+				To.Y >= Cell.Y)
 			{
-				//
+				PossiblePoints.Add(Cell);
 			}
 		}
 	}
 	//*/
+	/*
 	for (int32 row = GridPoints.Num()-1; row >= 0; --row)
 	{
 		for (int32 col = GridPoints[row].Num()-1; col >= 0; --col)
@@ -652,6 +709,58 @@ FVector ARoomGen::GeneratePoint(const FVector From, const FVector To)
 			}
 		}
 	}
+	//*/
 
 	return PossiblePoints[FMath::RandRange(0, PossiblePoints.Num()-1)];
+}
+void ARoomGen::MakeHole(const FVector DoorPoint)
+{
+	if (bUseGrid)
+	{
+		FTransform CurrentInstanceTransform;
+		FVector InstanceLocation;
+
+		for (int32 i = ISMeshCompWall->GetInstanceCount() - 1; i >= 0; --i)
+		{
+			ISMeshCompWall->GetInstanceTransform(i, CurrentInstanceTransform);
+			InstanceLocation = CurrentInstanceTransform.GetTranslation();
+
+			/// Check if some doorway was placed at this location before...
+			if (DoorPoints.Contains(FVector(InstanceLocation.X, InstanceLocation.Y, 0.f)))
+			{
+				return;
+			}
+
+			if (DoorPoint.X == InstanceLocation.X)
+			{
+				if (DoorPoint.X == InstanceLocation.X && DoorPoint.Y == InstanceLocation.Y ||
+					DoorPoint.Y == InstanceLocation.Y + WallY / 2)
+				{
+					ISMeshCompWall->RemoveInstance(i);
+					DoorPoints.AddUnique(FVector(InstanceLocation.X, InstanceLocation.Y, InstanceLocation.Z));
+					ISMeshCompDoorway->AddInstance(CurrentInstanceTransform);
+					return;
+				}
+			}
+			else if (DoorPoint.Y == InstanceLocation.Y)
+			{
+				if (DoorPoint.X == InstanceLocation.X && DoorPoint.Y == InstanceLocation.Y ||
+					DoorPoint.X == InstanceLocation.X + WallX / 2)
+				{
+					ISMeshCompWall->RemoveInstance(i);
+					DoorPoints.AddUnique(FVector(InstanceLocation.X, InstanceLocation.Y, InstanceLocation.Z));
+					ISMeshCompDoorway->AddInstance(CurrentInstanceTransform);
+					return;
+				}
+			}
+
+		} /// for end
+
+	}	/// bUseGrid
+	else
+	{
+		FTransform NewTransform;
+		NewTransform.SetLocation(DoorPoint);
+		ISMeshCompDoorway->AddInstance(NewTransform);
+	}
 }

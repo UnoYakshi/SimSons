@@ -5,20 +5,25 @@
 #include "GameFramework/Actor.h"
 #include "RoomGen.generated.h"
 
-USTRUCT()
+USTRUCT(Blueprintable)
 struct FRoom
 {
 	GENERATED_USTRUCT_BODY()
 
 	/// Room's physical data...
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Config)
 	int32 Square;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Config)
 	int32 Width;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Config)
 	int32 Length;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Config)
 	FVector Origin;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Config)
 	FVector End;
 
-	/// Room's relationships...
-	//TArray< FRoom* > Children;
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Config)
 	FRoom* Parent;
 
 	void Destroy()
@@ -42,10 +47,10 @@ struct FRoom
 		CalcParams();
 	}
 
-	FVector GetIntersectionCenterWith(const FRoom AnotherRoom)
+	FVector GetIntersectionCenterWith(const FRoom AnotherRoom, FVector Tiles)
 	{
-		float TileX = 400.f;
-		float TileY = 400.f;
+		float TileX = Tiles.X;
+		float TileY = Tiles.Y;
 
 		/// Another room is above...
 		if (End.Y == AnotherRoom.Origin.Y)
@@ -136,7 +141,7 @@ struct FRoom
 	{
 		CalcSquare();
 	}
-};	
+};
 
 UCLASS(Blueprintable)
 class SIMSONS_API ARoomGen : public AActor
@@ -154,12 +159,20 @@ public:
 	// PROPS
 	///////////////////////////////////
 	
-	///
+	/// Number of rooms defined by user...
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
 	int32 RoomCount;
 
+	/// Floors count...
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
+	int32 FloorCount;
+
+	/// Use grid system?..
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
 	bool bUseGrid;
+	/// Generate floor?..
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
+	bool bGenerateFloor;
 
 
 	/// Room's min-max X...
@@ -190,11 +203,15 @@ public:
 	int32 WallX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
 	int32 WallY;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
+	int32 WallZ;
 
 
 	// Workset...
 
+	int32 RealRoomCount;
 	int32 _RoomCount;
+	int32 _FloorCount;
 
 	TArray< FVector > RoomDotCoordinates;
 
@@ -204,7 +221,11 @@ public:
 	/// Temp room for processing...
 	FRoom* CurrentRoom;
 
+	/// If bUseGrid...
 	TArray< TArray< FVector > > GridPoints;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
+	TArray< FRoom > Restrictions;
+	TArray< FVector > DoorPoints;
 
 	// Content...
 
@@ -235,16 +256,18 @@ public:
 	// FUNC
 	///////////////////////////////////
 	
+	UFUNCTION(BlueprintCallable, Category = "CustomCat")
+	void Start();
 	void Init();
 
 	UFUNCTION()
 	void GenerateRooms();
 	void GenerateDoorways();
-
 	void GenerateWall(const FVector From, const FVector To, const FRotator Rot);
 
 
 	// UTIL
 	bool SatisfyLimits(const FVector PointToCheck, const FRoom* InRoom, const bool IsHorizontal);
 	FVector GeneratePoint(const FVector From, const FVector To);
+	void MakeHole(const FVector DoorPoint);
 };
