@@ -166,7 +166,6 @@ void ARoomGen::Start()
 		WallX != 0 && WallY != 0)
 	{
 		_RoomCount = RoomCount - 1;
-		_FloorCount = FloorCount - 1;
 		
 		/// Auto-generation if previous failed...
 		/*
@@ -465,22 +464,24 @@ void ARoomGen::GenerateWall(const FVector From, const FVector To, const FRotator
 	{
 		for (int32 j = MinY; j < MaxY; j += BlockX)
 		{
-			//*
-			FTransform NewTransform(Rot); 
-			NewTransform.SetLocation(FVector(From.X, (float)j, 0.f));
-			//*/
-			ISMeshCompWall->AddInstance(NewTransform);
+			for (int32 k = FloorCount - 1; k >= 0; --k)
+			{
+				FTransform NewTransform(Rot);
+				NewTransform.SetLocation(FVector(From.X, (float)j, (float)WallZ * k));
+				ISMeshCompWall->AddInstance(NewTransform);
+			}
 		}
 	}
 	else if (EqualY)
 	{
 		for (int32 i = MinX; i < MaxX; i += BlockY)
 		{
-			//*
-			FTransform NewTransform(Rot); 
-			NewTransform.SetLocation(FVector((float)i, From.Y, 0.f));
-			//*/
-			ISMeshCompWall->AddInstance(NewTransform);
+			for (int32 k = FloorCount - 1; k >= 0; --k)
+			{
+				FTransform NewTransform(Rot);
+				NewTransform.SetLocation(FVector((float)i, From.Y, (float)WallZ * k));
+				ISMeshCompWall->AddInstance(NewTransform);
+			}
 		}
 	}
 	else
@@ -529,13 +530,12 @@ void ARoomGen::GenerateWall(const FVector From, const FVector To, const FRotator
 		{
 			for (int32 j = FromY; j < ToY; j += BlockY)
 			{
-				//FTransform NewTransform(Rot.Quaternion(), FVector((float)i, (float)j, 0.f));
-				//*	
-				FTransform NewTransform(Rot); //= GetTransform();
-											  //NewTransform.SetRotation(Rot.Quaternion());
-				NewTransform.SetLocation(FVector((float)i, (float)j, 0.f));
-				//*/
-				ISMeshCompWall->AddInstance(NewTransform);
+				for (int32 k = FloorCount - 1; k >= 0; --k)
+				{
+					FTransform NewTransform(Rot);
+					NewTransform.SetLocation(FVector((float)i, (float)j, (float)WallZ * k));
+					ISMeshCompWall->AddInstance(NewTransform);
+				}
 			}
 		}
 	}
@@ -590,18 +590,21 @@ void ARoomGen::GenerateDoorways()
 			}
 
 			//*
-			/// Find a wall between to rooms...
-			WallCenterBetween2Rooms = Rooms[i].GetIntersectionCenterWith(Rooms[j], FVector(WallX, WallY, 0));
-			if (WallCenterBetween2Rooms != FVector::ZeroVector)
+			for (int32 k = FloorCount - 1; k >= 0; --k)
 			{
-				//WallCenterBetween2Rooms += FVector(560.f, 150.f, 500.f);
-				//WallCenterBetween2Rooms.Z = 500.f;
-				/*
-				GLog->Log("\n ---- \n DoorGen :: Intersection");
-				GLog->Log(FString::Printf(_T("Room[%d] -- Rooms[%d]"), i, j));
-				GLog->Log(WallCenterBetween2Rooms.ToString());
-				//*/
-				MakeHole(WallCenterBetween2Rooms);
+				/// Find a wall between to rooms...
+				WallCenterBetween2Rooms = Rooms[i].GetIntersectionCenterWith(Rooms[j], FVector(WallX, WallY, WallZ));
+				if (WallCenterBetween2Rooms != FVector::ZeroVector)
+				{
+					//WallCenterBetween2Rooms += FVector(560.f, 150.f, 500.f);
+					//WallCenterBetween2Rooms.Z = 500.f;
+					/*
+					GLog->Log("\n ---- \n DoorGen :: Intersection");
+					GLog->Log(FString::Printf(_T("Room[%d] -- Rooms[%d]"), i, j));
+					GLog->Log(WallCenterBetween2Rooms.ToString());
+					//*/
+					MakeHole(WallCenterBetween2Rooms);
+				}
 			}
 			//*/
 		}
@@ -726,7 +729,7 @@ void ARoomGen::MakeHole(const FVector DoorPoint)
 			InstanceLocation = CurrentInstanceTransform.GetTranslation();
 
 			/// Check if some doorway was placed at this location before...
-			if (DoorPoints.Contains(FVector(InstanceLocation.X, InstanceLocation.Y, 0.f)))
+			if (DoorPoints.Contains(FVector(InstanceLocation.X, InstanceLocation.Y, InstanceLocation.Z)))
 			{
 				return;
 			}

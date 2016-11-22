@@ -51,6 +51,7 @@ struct FRoom
 	{
 		float TileX = Tiles.X;
 		float TileY = Tiles.Y;
+		float TileZ = Tiles.Z;
 
 		/// Another room is above...
 		if (End.Y == AnotherRoom.Origin.Y)
