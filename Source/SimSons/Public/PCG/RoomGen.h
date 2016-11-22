@@ -144,7 +144,7 @@ struct FRoom
 	}
 };
 
-UCLASS(Blueprintable)
+UCLASS(Blueprintable, BlueprintType, ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class SIMSONS_API ARoomGen : public AActor
 {
 	GENERATED_BODY()
